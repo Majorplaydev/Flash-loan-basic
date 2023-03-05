@@ -1,5 +1,5 @@
 const { expect } = require('chai');
-const { ethers } = require('hardhat');
+const hre = require('hardhat');
 
 
 const tokens = (n) => {
@@ -9,10 +9,12 @@ const tokens = (n) => {
 const ether = tokens
 
 describe ('FlashLoan', () => {
+	let token, flashLoan, FlashLoanReceiver
+	let deployer
 	
 	beforeEach(async () => {
 		//Setup accounts 
-		accounts = ethers.getSigners()
+		accounts = await ethers.getSigners()
 		deployer = accounts[0]
 
 		// Load accounts
@@ -33,12 +35,27 @@ describe ('FlashLoan', () => {
 		//Deposit my token into pool
 		transaction = await flashLoan.connect(deployer).depositTokens(tokens(10000000))
 		await transaction.wait()
-		
+
+		// Deploy flash Loan Receiver
+		flashLoanReceiver = await FlashLoanReceiver.deploy(flashLoan.address)
+
 	})
+
 	describe('Deployment', () => {
 
 		it('sends tokens to the flash loan pool contract', async () => {
 		   expect(await token.balanceOf(flashLoan.address)).to.equal(tokens(10000000))
 		})
 	})
+
+	describe('Borrowing funds from flash loan pool', () => {
+ 	  it('borrows funds from the pool', async () => {
+ 	  	let amount = tokens(1000)
+ 	  	let transaction = await flashLoanReceiver.connect(deployer).executeFlashLoan(amount)
+ 	  	let result = await transaction.wait()
+
+ 	  	await expect(transaction).to.emit(flashLoanReceiver, 'FlashLoanReceived')
+ 	  	.withArgs(token.address, amount)
+ 	  })
+	})  
 })
